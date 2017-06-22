@@ -1,0 +1,50 @@
+use std
+
+pkg wl =
+	type object = struct
+		conn: connection#
+		id: uint32
+		dispatch: std.option((op: uint16, d: byte[:] -> void))
+	;;
+
+	type entry = union
+		`Eobj object#
+		`Efree uint32
+	;;
+
+	type map = struct
+		client: entry[:]
+		server: entry[:]
+		serverside: bool
+		free: uint32
+	;;
+
+	type connection = struct
+		fd: std.fd
+		inp: connbuf
+		out: connbuf
+		objs: map
+	;;
+
+	type display = struct
+		obj: object
+		conn: connection
+	;;
+
+	type connbuf = struct
+		data: byte[4096]
+		head: uint
+		tail: uint
+
+		fds: std.fd[28]
+		nfds: int
+	;;
+
+	type argument = union
+		`Arguint uint32
+		`Argint int32
+		`Argstr byte[:]
+		`Argfd std.fd
+	;;
+;;
+

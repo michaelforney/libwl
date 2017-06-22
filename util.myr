@@ -1,0 +1,78 @@
+use std
+use "types"
+
+pkg wl =
+	pkglocal generic bytes: (v: @a# -> byte[:])
+
+	/* object map */
+	pkglocal const mapput: (m: map#, obj: object# -> uint32)
+	pkglocal const mapget: (m: map#, id: uint32 -> std.option(object#))
+;;
+
+const Mapserver = 0xff000000
+
+generic bytes = {v
+	-> (v: byte#)[:sizeof(@a)]
+}
+
+const mapdel = {m: map#, id
+	var entries
+
+	if id < Mapserver
+		entries = &m.client
+	else
+		entries = &m.server
+		id -= Mapserver
+	;;
+	if id < entries#.len
+		entries#[id] = `Efree m.free
+		m.free = id
+	;;
+}
+
+const mapput = {m: map#, obj
+	var entries, entry, base, id
+
+	if m.serverside
+		entries = &m.server
+		base = Mapserver
+	else
+		entries = &m.client
+		base = 0
+	;;
+	if m.free != 0
+		id = m.free
+		entry = &entries#[m.free]
+		match entry#
+		| `Efree next: m.free = next
+		| _:
+		;;
+	else
+		std.slgrow(entries, entries#.len + 1)
+		id = entries#.len - 1
+		entry = &entries#[id]
+	;;
+	entry# = `Eobj obj
+
+	-> id + base
+}
+
+const mapget = {m: map#, id
+	var entries
+
+	if id < Mapserver
+		entries = &m.client
+	else
+		entries = &m.server
+		id -= Mapserver
+	;;
+	if id < entries#.len
+		match entries#[id]
+		| `Eobj obj: -> `std.Some obj
+		| _:
+		;;
+	;;
+
+	-> `std.None
+}
+

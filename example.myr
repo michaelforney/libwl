@@ -1,0 +1,97 @@
+use std
+use wl
+use sys
+use "sys"
+
+var compositor: wl.compositor#
+var shm: wl.shm#
+var shell: wl.shell#
+
+type image = struct
+	width: int32
+	height: int32
+	data: byte[:]
+	pool: wl.shmpool#
+	buffer: wl.buffer#
+;;
+
+const imagefill = {i: image#, color: byte[4]
+	var p
+
+	for p = i.data; p.len > 4; p = p[4:]
+		std.slcp(p[:4], color[:])
+	;;
+}
+
+impl wl.registry_listener wl.registry =
+	registry_global = {r, ev
+		match ev.interface
+		| "wl_compositor":
+			compositor = wl.registry_bind(r, ev.name, ev.interface, std.min(ev.version, 1))
+		| "wl_shm":
+			shm = wl.registry_bind(r, ev.name, ev.interface, std.min(ev.version, 1))
+		| "wl_shell":
+			shell = wl.registry_bind(r, ev.name, ev.interface, std.min(ev.version, 1))
+		| _:
+		;;
+	}
+	registry_globalremove = {r, ev
+		std.put("global_remove {}\n", ev#)
+	}
+;;
+
+const mkimage = {w, h -> image#
+	var fd, sz, data, pool, buffer
+
+	fd = sys.memfdcreate("libwl", sys.Mfdcloexec)
+	if fd == -1
+		std.fatal("memfdcreate failed\n")
+	;;
+	sz = (w * h * 4: std.size)
+	if sys.fallocate(fd, 0, (sz: sys.off)) != 0
+		std.fatal("fallocate failed\n")
+	;;
+	data = sys.mmap((0: byte#), (sz: sys.size), sys.Mprotrw, sys.Mshared, fd, 0)
+	if data == sys.Mapbad
+		std.fatal("mmap failed\n")
+	;;
+	pool = wl.shm_createpool(shm, (fd: std.fd), (sz: int32))
+	buffer = wl.shmpool_createbuffer(pool, 0, w, h, w * 4, wl.Shmformat_xrgb8888)
+
+	-> std.mk([
+		.width = w,
+		.height = h,
+		.data = data[:sz],
+		.pool = pool,
+		.buffer = buffer,
+	])
+}
+
+const main = {
+	var dpy, reg, surface, shellsurface, img
+
+	dpy = std.try(wl.connect(`std.None))
+	reg = wl.display_getregistry(dpy)
+	wl.registry_setlistener(reg, reg)
+	wl.roundtrip(dpy)
+
+	if compositor == (0: wl.compositor#)
+		std.fatal("no wl_compositor\n")
+	;;
+
+	surface = wl.compositor_createsurface(compositor)
+	shellsurface = wl.shell_getshellsurface(shell, surface)
+	wl.shellsurface_settoplevel(shellsurface)
+
+	img = mkimage(200, 200)
+	imagefill(img, [0, 0xff, 0xff, 0])
+	wl.surface_attach(surface, `std.Some img.buffer, 0, 0)
+	wl.surface_damage(surface, 0, 0, 200, 200)
+	wl.surface_commit(surface)
+
+	while true
+		wl.dispatch(dpy)
+	;;
+
+	std.exit(0)
+}

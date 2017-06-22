@@ -1,0 +1,17 @@
+lib wl =
+	client.myr
+	client-protocol.myr
+	connection.myr
+	util.myr
+	types.myr
+	sys+linux-x64.myr
+;;
+
+bin example =
+	example.myr
+	sys+linux-x64.myr
+
+	lib wl
+;;
+
+

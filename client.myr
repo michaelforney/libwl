@@ -1,0 +1,99 @@
+use std
+use "types"
+use "util"
+use "connection"
+use "client-protocol"
+
+pkg wl =
+	const connect : (name: std.option(byte[:]) -> std.result(display#, byte[:]))
+	const flush : (d: display# -> void)
+	const dispatch : (d: display# -> void)
+	const roundtrip : (d: display# -> void)
+;;
+
+const connect = {name
+	var d: display#, rtdir, addr, result
+
+	match std.getenv("XDG_RUNTIME_DIR")
+	| `std.Some val: rtdir = val
+	| _: -> `std.Err "XDG_RUNTIME_DIR not set in environment"
+	;;
+
+	match name
+	| `std.None: name = std.getenv("WAYLAND_DISPLAY")
+	| _:
+	;;
+	match name
+	| `std.None: name = `std.Some "wayland-0"
+	| _:
+	;;
+
+	addr = std.fmt("unix!{}/{}", rtdir, std.get(name))
+	result = std.dial(addr)
+	std.slfree(addr)
+	match result
+	| `std.Ok fd:
+		d = std.mk([.conn = [.fd = fd]])
+	| `std.Err err: -> `std.Err err
+	;;
+
+	/* object ID 0 is invalid */
+	mapput(&d.conn.objs, (0 : object#))
+
+	d.obj.conn = &d.conn
+	d.obj.id = mapput(&d.conn.objs, &d.obj)
+
+	-> `std.Ok d
+}
+
+const flush = {d
+	write(&d.conn)
+}
+
+const dispatch = {d: display#
+	var avail, id, op, len
+	var p: uint32[2]
+
+	flush(d)
+	read(&d.conn)
+	avail = d.conn.inp.head - d.conn.inp.tail
+
+	while avail >= p.len
+		bufcopy(&d.conn.inp, bytes(&p), 0)
+		id = p[0]
+		op = (p[1] & 0xffff : uint16)
+		len = (p[1] >> 16 : uint)
+
+		if avail < len
+			break
+		;;
+
+		match mapget(&d.conn.objs, id)
+		| `std.Some &[.dispatch = `std.Some fn]:
+			var data = std.slalloc((len: std.size) - 8)
+			bufcopy(&d.conn.inp, data, 8)
+			fn(op, data)
+			std.slfree(data)
+		| _:
+		;;
+
+		avail -= len
+		d.conn.inp.tail += len
+	;;
+}
+
+impl callback_listener bool =
+	callback_done = {done, ev
+		done# = true
+	}
+;;
+
+const roundtrip = {d: display#
+	var cb, done = false
+
+	cb = display_sync(d)
+	callback_setlistener(cb, &done)
+	while !done
+		dispatch(d)
+	;;
+}

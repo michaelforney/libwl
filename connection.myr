@@ -1,0 +1,247 @@
+use std
+use sys
+use "sys"
+use "util"
+use "types"
+
+pkg wl =
+	pkglocal const mkobj: (c: connection# -> object#)
+
+	pkglocal const read: (c: connection# -> void)
+	pkglocal const write: (c: connection# -> void)
+
+	pkglocal const bufcopy: (b: connbuf#, d: byte[:], offset: uint -> void)
+
+	pkglocal const marshal: (c: connection#, obj: object#, op: uint32, args: argument[:] -> void)
+
+	pkglocal generic get: (d: byte[:]# -> @a)
+	pkglocal const getstr: (d: byte[:]# -> byte[:])
+;;
+
+const mkobj = {c: connection#
+	var obj
+
+	obj = std.mk([.conn = c])
+	obj.id = mapput(&c.objs, obj)
+
+	-> obj
+}
+
+const read = {c: connection#
+	var iov: sys.iovec[2], msg
+
+	msg = [
+		.iov = &iov[0],
+		.iovlen = bufputiov(&c.inp, iov[:]),
+	]
+	match sys.recvmsg((c.fd: sys.fd), &msg, 0)
+	| -1: std.fatal("recvmsg failed\n")
+	| 0: std.fatal("server closed connection\n")
+	| n: c.inp.head += (n: uint)
+	;;
+}
+
+const align = {v
+	-> (v + sizeof(std.size) - 1) & ~(sizeof(std.size) - 1)
+}
+
+const write = {c: connection#
+	var iov: sys.iovec[2], msg, n
+
+	while c.out.head - c.out.tail > 0
+		msg = [
+			.iov = &iov[0],
+			.iovlen = bufgetiov(&c.out, iov[:]),
+		]
+
+		if c.out.nfds > 0
+			var cmsgbuf: byte[1024]
+			var cmsg = (&cmsgbuf: sys.cmsghdr#)
+			var data = (&c.out.fds: byte#)[:sizeof(std.fd) * c.out.nfds]
+
+			std.assert(cmsgbuf.len >= align(sizeof(sys.cmsghdr)) + align(data.len), "not enough space to send fds\n")
+			cmsg# = [
+				.level = (sys.Solsock: int32),
+				.mtype = (sys.Scmrights: int32),
+				.len = (align(sizeof(sys.cmsghdr)) + data.len: uint32),
+			]
+			std.slcp(cmsg.data[:data.len], data)
+			msg.control = (&cmsgbuf: byte#)
+			msg.controllen = cmsg.len
+		;;
+
+		n = sys.sendmsg((c.fd: sys.fd), &msg, 0)
+		if n == -1
+			std.fatal("sendmsg failed")
+		;;
+
+		for fd in c.out.fds[:c.out.nfds]
+			sys.close((fd: sys.fd))
+		;;
+		c.out.nfds = 0
+
+		c.out.tail += (n: uint)
+	;;
+}
+
+const marshal = {c, obj, op, args
+	var sz, data, p
+
+	/* calculate size */
+	sz = 2
+	for arg in args
+		match arg
+		| `Arguint _: sz++
+		| `Argint  _: sz++
+		| `Argstr  x: sz += 1 + (x.len + 1 + 3) / 4
+		| `Argfd   _:
+		;;
+	;;
+
+	data = std.slalloc(sz * 4)
+	p = data
+	put(&p, obj.id)
+	put(&p, ((sz << 16) * 4: uint32) | (op & 0xffff))
+
+	/* encode arguments */
+	for arg in args
+		match arg
+		| `Arguint x: put(&p, x)
+		| `Argint  x: put(&p, x)
+		| `Argstr  x:
+			put(&p, (x.len + 1: uint32))
+			std.slcp(p[:x.len], x)
+			p[x.len] = 0
+			p = p[(x.len + 1 + 3) & ~3:]
+		| `Argfd   x:
+			std.assert(c.out.nfds < c.out.fds.len, "too many fds")
+			c.out.fds[c.out.nfds] = x
+			c.out.nfds++
+		;;
+	;;
+
+	//dump(data)
+
+	bufput(&c.out, data)
+	std.slfree(data)
+}
+
+/* debug */
+const dump = {data: byte[:]
+	var tmp: int[:] = std.slalloc(data.len)
+	var i
+
+	for i = 0; i < data.len; i++
+		tmp[i] = (data[i]: int)
+	;;
+	std.put("{}\n", tmp)
+	std.slfree(tmp)
+}
+
+/* copy to/from byte slices */
+generic put = {d: byte[:]#, v: @a
+	std.slcp(d#[:sizeof(@a)], bytes(&v))
+	d# = d#[sizeof(@a):]
+}
+
+generic get = {d
+	var x: @a
+
+	std.slcp(bytes(&x), d#[:sizeof(@a)])
+	d# = d#[sizeof(@a):]
+
+	-> x
+}
+
+const getstr = {d
+	var len: uint32, str
+
+	std.slcp(bytes(&len), d#[:4])
+	str = d#[4:4+len-1]
+	d# = d#[(4+len+3) & ~3:]
+
+	-> str
+}
+
+/* connection buffers */
+const bufputiov = {b: connbuf#, iov: sys.iovec[:]
+	var head, tail
+
+	head = b.head % b.data.len
+	tail = b.tail % b.data.len
+
+	if head < tail
+		iov[0] = [
+			.base = &b.data[head],
+			.len = (tail - head : uint64),
+		]
+		-> 1
+	elif tail == 0
+		iov[0] = [
+			.base = &b.data[head],
+			.len = (b.data.len - head : uint64),
+		]
+		-> 1
+	else
+		iov[0] = [
+			.base = &b.data[head],
+			.len = (b.data.len - head : uint64),
+		]
+		iov[1] = [
+			.base = (b.data[:]: byte#),
+			.len = (tail : uint64),
+		]
+		-> 2
+	;;
+}
+
+const bufgetiov = {b : connbuf#, iov : sys.iovec[:]
+	var head, tail
+
+	head = b.head % b.data.len
+	tail = b.tail % b.data.len
+
+	if tail < head
+		iov[0] = [
+			.base = &b.data[tail],
+			.len = (head - tail : uint64),
+		]
+		-> 1
+	else
+		iov[0] = [
+			.base = &b.data[tail],
+			.len = (b.data.len - tail : uint64),
+		]
+		iov[1] = [
+			.base = &b.data[0],
+			.len = (head : uint64),
+		]
+		-> 2
+	;;
+}
+
+const bufput = {b: connbuf#, d: byte[:]
+	var head, n
+	head = b.head % b.data.len
+	if head + d.len > b.data.len
+		n = b.data.len - head
+		std.slcp(b.data[head:head+n], d[:n])
+		std.slcp(b.data[:d.len-n], d[n:])
+	else
+		std.slcp(b.data[head:head+d.len], d)
+	;;
+	b.head += d.len + 3 & ~3
+}
+
+const bufcopy = {b: connbuf#, d: byte[:], offset: uint
+	var tail, n
+
+	tail = (b.tail + offset) % b.data.len
+	if tail + d.len > b.data.len
+		n = b.data.len - tail
+		std.slcp(d[:n], b.data[tail:tail+n])
+		std.slcp(d[n:], b.data[:d.len-n])
+	else
+		std.slcp(d, b.data[tail:tail+d.len])
+	;;
+}

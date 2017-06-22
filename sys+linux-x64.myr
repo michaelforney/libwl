@@ -1,0 +1,69 @@
+use sys
+
+// TODO: get this cleaned up and included in libsys
+
+pkg sys =
+	/*
+	type msghdr = struct
+		name: byte[:]
+		iov: byte[:][:]
+		control: byte[:]
+		flags: int
+	;;
+	*/
+
+	type iovec = struct
+		base : byte#
+		len : uint64
+	;;
+
+	type msghdr = struct
+		name : byte#
+		namelen : uint32
+		iov : iovec#
+		iovlen : int32
+		__pad1 : int32
+		control : byte#
+		controllen : uint32
+		__pad2 : uint32
+		flags : int32
+	;;
+
+	type cmsghdr = struct
+		len : uint32
+		__pad1 : int32
+		level : int32
+		mtype : int32
+		data : byte[...]
+	;;
+
+	const Scmrights = 1
+	const Sysmemfdcreate: sys.scno = 319
+
+	const Mfdcloexec: uint = 1
+
+	const sendmsg : (fd : fd, msg : msghdr#, int -> size)
+	const recvmsg : (fd : fd, msg : msghdr#, int -> size)
+
+	const memfdcreate: (name: byte[:], flags: uint -> fd)
+
+	const fallocate: (fd: fd, base: sys.off, len: sys.off -> int)
+;;
+
+extern const cstring: (str: byte[:] -> byte#)
+
+const sendmsg = {fd : fd, msg : msghdr#, flags : int
+	-> (sys.syscall(sys.Syssendmsg, a(fd), msg, a(flags)) : size)
+}
+
+const recvmsg = {fd : fd, msg : msghdr#, flags : int
+	-> (sys.syscall(sys.Sysrecvmsg, a(fd), msg, a(flags)) : size)
+}
+
+const memfdcreate = {name, flags
+	-> (sys.syscall(Sysmemfdcreate, cstring(name), a(flags)): fd)
+}
+
+const fallocate = {fd, base, len
+	-> (sys.syscall(Sysfallocate, a(fd), a(0), a(base), a(len)): int)
+}
