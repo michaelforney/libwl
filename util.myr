@@ -2,12 +2,16 @@ use std
 use "types"
 
 pkg wl =
+	const Nullobj: object
+
 	pkglocal generic bytes: (v: @a# -> byte[:])
 
 	/* object map */
 	pkglocal const mapput: (m: map#, obj: object# -> uint32)
 	pkglocal const mapget: (m: map#, id: uint32 -> std.option(object#))
 ;;
+
+const Nullobj = [.id=0]
 
 const Mapserver = 0xff000000
 
@@ -60,6 +64,9 @@ const mapput = {m: map#, obj
 const mapget = {m: map#, id
 	var entries
 
+	if id == 0
+		-> `std.None
+	;;
 	if id < Mapserver
 		entries = &m.client
 	else

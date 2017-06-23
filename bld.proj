@@ -7,6 +7,20 @@ lib wl =
 	sys+linux-x64.myr
 ;;
 
+gen client-protocol.myr {dep=scanner.py} =
+	python ./scanner.py -d wayland-client wayland.xml client-protocol.myr
+;;
+
+lib xdg =
+	xdg-client-protocol.myr
+
+	lib wl
+;;
+
+gen xdg-client-protocol.myr {dep=scanner.py} =
+	python ./scanner.py -p xdg -d wayland-protocols unstable/xdg-shell/xdg-shell-unstable-v5.xml xdg-client-protocol.myr
+;;
+
 bin example =
 	example.myr
 	sys+linux-x64.myr

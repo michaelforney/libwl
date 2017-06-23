@@ -1,6 +1,8 @@
 use std
 
 pkg wl =
+	type fixed = uint32
+
 	type object = struct
 		conn: connection#
 		id: uint32
@@ -41,10 +43,9 @@ pkg wl =
 	;;
 
 	type argument = union
-		`Arguint uint32
-		`Argint int32
-		`Argstr byte[:]
-		`Argfd std.fd
+		`Argint   uint32
+		`Argdata  (std.option(byte[:]), bool)
+		`Argfd    std.fd
 	;;
 ;;
 

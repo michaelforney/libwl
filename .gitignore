@@ -1,4 +1,7 @@
 *.o
 *.use
+/client-protocol.myr
+/xdg-client-protocol.myr
 /libwl.a
+/libxdg.a
 /example

@@ -6,6 +6,8 @@ use "sys"
 var compositor: wl.compositor#
 var shm: wl.shm#
 var shell: wl.shell#
+var seat: wl.seat#
+var keyboard: wl.keyboard#
 
 type image = struct
 	width: int32
@@ -32,12 +34,35 @@ impl wl.registry_listener wl.registry =
 			shm = wl.registry_bind(r, ev.name, ev.interface, std.min(ev.version, 1))
 		| "wl_shell":
 			shell = wl.registry_bind(r, ev.name, ev.interface, std.min(ev.version, 1))
+		| "wl_seat":
+			seat = wl.registry_bind(r, ev.name, ev.interface, std.min(ev.version, 4))
 		| _:
 		;;
 	}
 	registry_globalremove = {r, ev
 		std.put("global_remove {}\n", ev#)
 	}
+;;
+
+impl wl.seat_listener wl.seat =
+	seat_name = {_, _;}
+	seat_capabilities = {seat, ev
+		if ev.capabilities & wl.Seatcapability_keyboard != 0
+			keyboard = wl.seat_getkeyboard(seat)
+			wl.keyboard_setlistener(keyboard, keyboard)
+		;;
+	}
+;;
+
+impl wl.keyboard_listener wl.keyboard =
+	keyboard_key = {r, ev
+		std.put("key {}\n", ev#)
+	}
+	keyboard_keymap = {_, _;}
+	keyboard_enter = {_, _;}
+	keyboard_leave = {_, _;}
+	keyboard_modifiers = {_, _;}
+	keyboard_repeatinfo = {_, _;}
 ;;
 
 const mkimage = {w, h -> image#
@@ -78,6 +103,10 @@ const main = {
 	if compositor == (0: wl.compositor#)
 		std.fatal("no wl_compositor\n")
 	;;
+	if seat == (0: wl.seat#)
+		std.fatal("no wl_seat\n")
+	;;
+	wl.seat_setlistener(seat, seat)
 
 	surface = wl.compositor_createsurface(compositor)
 	shellsurface = wl.shell_getshellsurface(shell, surface)
