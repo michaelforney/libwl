@@ -4,7 +4,7 @@ use "util"
 use "types"
 
 pkg wl =
-	const mkobj: (c: connection#, ver: uint32 -> object#)
+	const mkobj: (c: connection#, iface: interface#, ver: uint32 -> object#)
 
 	const marshal: (c: connection#, obj: object#, op: uint32, args: argument[:] -> void)
 	trait unmarshal @a =
@@ -18,11 +18,12 @@ pkg wl =
 	pkglocal const bufcopy: (b: connbuf#, d: byte[:], offset: uint -> void)
 ;;
 
-const mkobj = {c, ver
+const mkobj = {c, iface, ver
 	var obj
 
 	obj = std.mk([
 		.conn = c,
+		.interface = iface,
 		.version = ver,
 	])
 	obj.id = mapput(&c.objs, obj)

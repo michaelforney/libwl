@@ -33,7 +33,10 @@ const connect = {name
 	std.slfree(addr)
 	match result
 	| `std.Ok fd:
-		d = std.mk([.conn = [.fd = fd]])
+		d = std.mk([
+			.obj = [.interface = &display_interface],
+			.conn = [.fd = fd],
+		])
 	| `std.Err err: -> `std.Err err
 	;;
 

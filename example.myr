@@ -28,13 +28,13 @@ impl wl.registry_listener wl.registry =
 	registry_global = {r, ev
 		match ev.interface
 		| "wl_compositor":
-			compositor = wl.registry_bind(r, ev.name, ev.interface, std.min(ev.version, 1))
+			compositor = wl.registry_bind(r, ev.name, &wl.compositor_interface, std.min(ev.version, 1))
 		| "wl_shm":
-			shm = wl.registry_bind(r, ev.name, ev.interface, std.min(ev.version, 1))
+			shm = wl.registry_bind(r, ev.name, &wl.shm_interface, std.min(ev.version, 1))
 		| "wl_shell":
-			shell = wl.registry_bind(r, ev.name, ev.interface, std.min(ev.version, 1))
+			shell = wl.registry_bind(r, ev.name, &wl.shell_interface, std.min(ev.version, 1))
 		| "wl_seat":
-			seat = wl.registry_bind(r, ev.name, ev.interface, std.min(ev.version, 4))
+			seat = wl.registry_bind(r, ev.name, &wl.seat_interface, std.min(ev.version, 4))
 		| _:
 		;;
 	}

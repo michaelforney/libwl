@@ -6,6 +6,7 @@ pkg wl =
 	type object = struct
 		conn: connection#
 		id: uint32
+		interface: interface#
 		version: uint32
 		dispatch: std.option((op: uint16, d: byte[:] -> void))
 	;;
@@ -18,6 +19,10 @@ pkg wl =
 	type display = struct
 		obj: object
 		conn: connection
+	;;
+
+	type interface = struct
+		name: byte[:]
 	;;
 
 	pkglocal type map = struct

@@ -95,7 +95,8 @@ class Interface(object):
             elif sub.tag == "enum":
                 enums.append(Enum(sub))
 
-        self.name = interface_name(e.attrib["name"])
+        self.wlname = e.attrib["name"]
+        self.name = interface_name(self.wlname)
         self.requests = requests
         self.events = events
         self.enums = enums
@@ -120,15 +121,16 @@ def generateclient(interfaces, f):
         else:
             f.write("\n")
         f.write("\t/* {} */\n".format(i.name))
-        if (pkg, i.name) != ("wl", "display"):
+        if i.wlname != "wl_display":
             f.write("\ttype {} = wl.object\n".format(i.name))
+        f.write("\tconst {}_interface: wl.interface = [.name = \"{}\"]\n".format(i.name, i.wlname))
         for r in i.requests:
             decltype = "generic" if r.isgeneric() else "const"
             f.write("\t{} {}_{}: (obj: {}#".format(decltype, i.name, r.name, i.name))
             for arg in r.args:
                 if arg == r.newid:
                     if not arg.interface:
-                        f.write(", interface: byte[:], version: uint32")
+                        f.write(", interface: wl.interface#, version: uint32")
                 else:
                     f.write(", {}: {}".format(arg.name, arg.myrtype))
             f.write(" -> {})\n".format(r.newid.myrtype if r.newid else "void"))
@@ -153,7 +155,7 @@ def generateclient(interfaces, f):
 
     for i in interfaces:
         first = True
-        obj = "dpy" if (pkg, i.name) == ("wl", "display") else "obj"
+        obj = "dpy" if i.wlname == "wl_display" else "obj"
         for op, r in enumerate(i.requests):
             decltype = "generic" if r.isgeneric() else "const"
             argnames = "".join(", {}".format(arg.name) for arg in r.args if arg.type != "new_id")
@@ -169,7 +171,13 @@ def generateclient(interfaces, f):
                 f.write("\tvar obj = &dpy.obj\n")
 
             if r.newid:
-                f.write("\tvar newobj = wl.mkobj(obj.conn, obj.version)\n")
+                if r.newid.interface:
+                    version = "obj.version"
+                    interface = "&{}_interface".format(r.newid.interface)
+                else:
+                    version = "version"
+                    interface = "interface"
+                f.write("\tvar newobj = wl.mkobj(obj.conn, {}, {})\n".format(interface, version))
             f.write("\twl.marshal(obj.conn, (obj: wl.object#), {}, [\n".format(op))
             for arg in r.args:
                 names = {
@@ -190,7 +198,7 @@ def generateclient(interfaces, f):
                     elif arg.type in ("string", "array"):
                         name = "(`std.Some {}, {})".format(name, myrbool(arg.type == "string"))
                 if arg == r.newid and not arg.interface:
-                    f.write("\t\t`wl.Argdata (`std.Some interface, true),\n")
+                    f.write("\t\t`wl.Argdata (`std.Some interface.name, true),\n")
                     f.write("\t\t`wl.Argint version,\n")
                 f.write("\t\t`wl.Arg{} {},\n".format(arg.union, name))
             f.write("\t][:])\n")
