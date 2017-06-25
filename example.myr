@@ -1,7 +1,6 @@
 use std
 use wl
 use sys
-use "sys"
 
 var compositor: wl.compositor#
 var shm: wl.shm#
@@ -73,7 +72,7 @@ const mkimage = {w, h -> image#
 		std.fatal("memfdcreate failed\n")
 	;;
 	sz = (w * h * 4: std.size)
-	if sys.fallocate(fd, 0, (sz: sys.off)) != 0
+	if sys.fallocate(fd, 0, 0, (sz: sys.off)) != 0
 		std.fatal("fallocate failed\n")
 	;;
 	data = sys.mmap((0: byte#), (sz: sys.size), sys.Mprotrw, sys.Mshared, fd, 0)

@@ -1,6 +1,5 @@
 use std
 use sys
-use "sys"
 use "util"
 use "types"
 
@@ -56,19 +55,25 @@ const write = {c: connection#
 		]
 
 		if c.out.nfds > 0
-			var cmsgbuf: byte[1024]
-			var cmsg = (&cmsgbuf: sys.cmsghdr#)
+			type cmsgbuf = struct
+				hdr: sys.cmsghdr[...]
+				data: byte[1024]
+			;;
+
+			var buf: cmsgbuf
+			var cmsg = &buf.hdr[0]
 			var data = (&c.out.fds: byte#)[:sizeof(std.fd) * c.out.nfds]
 
-			std.assert(cmsgbuf.len >= align(sizeof(sys.cmsghdr)) + align(data.len), "not enough space to send fds\n")
+			msg.control = &buf.data[0]
+			msg.controllen = align(sizeof(sys.cmsghdr)) + align(data.len)
+			std.assert(buf.data.len >= msg.controllen, "not enough space to send fds\n")
+
 			cmsg# = [
-				.level = (sys.Solsock: int32),
-				.mtype = (sys.Scmrights: int32),
-				.len = (align(sizeof(sys.cmsghdr)) + data.len: uint32),
+				.level = sys.Solsocket,
+				.cmtype = sys.Scmrights,
+				.len = align(sizeof(sys.cmsghdr)) + data.len,
 			]
 			std.slcp(cmsg.data[:data.len], data)
-			msg.control = (&cmsgbuf: byte#)
-			msg.controllen = cmsg.len
 		;;
 
 		n = sys.sendmsg((c.fd: sys.fd), &msg, 0)

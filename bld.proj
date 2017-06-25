@@ -4,7 +4,6 @@ lib wl =
 	connection.myr
 	util.myr
 	types.myr
-	sys+linux-x64.myr
 ;;
 
 gen client-protocol.myr {dep=scanner.py} =
@@ -23,7 +22,6 @@ gen xdg-client-protocol.myr {dep=scanner.py} =
 
 bin example =
 	example.myr
-	sys+linux-x64.myr
 
 	lib wl
 ;;
