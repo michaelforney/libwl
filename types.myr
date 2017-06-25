@@ -6,6 +6,7 @@ pkg wl =
 	type object = struct
 		conn: connection#
 		id: uint32
+		version: uint32
 		dispatch: std.option((op: uint16, d: byte[:] -> void))
 	;;
 

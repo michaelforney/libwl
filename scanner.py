@@ -169,7 +169,7 @@ def generateclient(interfaces, f):
                 f.write("\tvar obj = &dpy.obj\n")
 
             if r.newid:
-                f.write("\tvar newobj = wl.mkobj(obj.conn)\n")
+                f.write("\tvar newobj = wl.mkobj(obj.conn, obj.version)\n")
             f.write("\twl.marshal(obj.conn, (obj: wl.object#), {}, [\n".format(op))
             for arg in r.args:
                 names = {
