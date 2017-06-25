@@ -11,6 +11,14 @@ pkg wl =
 	const roundtrip : (d: display# -> void)
 ;;
 
+impl wl.display_listener display =
+	display_error = {dpy, ev
+		std.fput(2, "{}@{}: error {}: {}\n", ev.objectid.interface.name, ev.objectid.id, ev.code, ev.message)
+	}
+	display_deleteid = {dpy, ev
+	}
+;;
+
 const connect = {name
 	var d: display#, rtdir, addr, result
 
@@ -45,6 +53,7 @@ const connect = {name
 
 	d.obj.conn = &d.conn
 	d.obj.id = mapput(&d.conn.objs, &d.obj)
+	display_setlistener(d, d)
 
 	-> `std.Ok d
 }
