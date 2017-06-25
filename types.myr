@@ -10,23 +10,9 @@ pkg wl =
 		dispatch: std.option((op: uint16, d: byte[:] -> void))
 	;;
 
-	type entry = union
+	pkglocal type entry = union
 		`Eobj object#
 		`Efree uint32
-	;;
-
-	type map = struct
-		client: entry[:]
-		server: entry[:]
-		serverside: bool
-		free: uint32
-	;;
-
-	type connection = struct
-		fd: std.fd
-		inp: connbuf
-		out: connbuf
-		objs: map
 	;;
 
 	type display = struct
@@ -34,7 +20,21 @@ pkg wl =
 		conn: connection
 	;;
 
-	type connbuf = struct
+	pkglocal type map = struct
+		client: entry[:]
+		server: entry[:]
+		serverside: bool
+		free: uint32
+	;;
+
+	pkglocal type connection = struct
+		fd: std.fd
+		inp: connbuf
+		out: connbuf
+		objs: map
+	;;
+
+	pkglocal type connbuf = struct
 		data: byte[4096]
 		head: uint
 		tail: uint
@@ -43,7 +43,7 @@ pkg wl =
 		nfds: int
 	;;
 
-	type argument = union
+	pkglocal type argument = union
 		`Argint   uint32
 		`Argdata  (std.option(byte[:]), bool)
 		`Argfd    std.fd
