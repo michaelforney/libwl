@@ -19,8 +19,8 @@ def interface_name(name):
 
 class Arg(object):
     def __init__(self, e):
-        interface = e.attrib.get("interface")
-        objtype = "{}#".format(interface_name(interface) or "wl.object")
+        interface = interface_name(e.attrib.get("interface"))
+        objtype = "{}#".format(interface or "wl.object")
         typemap = {
             "int": "int32",
             "uint": "uint32",
@@ -28,8 +28,8 @@ class Arg(object):
             "fd": "std.fd",
             "fixed": "wl.fixed",
             "array": "byte[:]",
-            "object": "{}#".format(interface_name(interface) or "wl.object"),
-            "new_id": "{}#".format(interface_name(interface) or "@a"),
+            "object": "{}#".format(interface or "wl.object"),
+            "new_id": "{}#".format(interface or "@a"),
         }
         unionmap = {
             "string": "data",
@@ -119,7 +119,7 @@ def generateclient(interfaces, f):
             first = False
         else:
             f.write("\n")
-        f.write("\t/* {} */\n".format(interface_name(i.name)))
+        f.write("\t/* {} */\n".format(i.name))
         if (pkg, i.name) != ("wl", "display"):
             f.write("\ttype {} = wl.object\n".format(i.name))
         for r in i.requests:
@@ -181,8 +181,7 @@ def generateclient(interfaces, f):
                 if arg.allownull:
                     if arg.type == "object":
                         # Pretty ugly, but the best I could come up with.
-                        name = "std.getv({}, (&wl.Nullobj: {}#)).id".format(
-                            name, interface_name(arg.interface))
+                        name = "std.getv({}, (&wl.Nullobj: {}#)).id".format(name, arg.interface)
                     elif arg.type in ("string", "array"):
                         name = "({}, {})".format(name, myrbool(arg.type == "string"))
                 else:
@@ -212,7 +211,7 @@ def generateclient(interfaces, f):
             for arg in e.args:
                 if arg.type == "object":
                     if arg.interface:
-                        o = "(o: {}#)".format(interface_name(arg.interface))
+                        o = "(o: {}#)".format(arg.interface)
                     else:
                         o = "o"
                     f.write("\t\t\tmatch mapget(&obj.conn.objs, wl.unmarshal(obj.conn, &d))\n")
