@@ -85,7 +85,7 @@ const write = {c: connection#
 			std.fatal("sendmsg failed")
 		;;
 
-		for fd in c.out.fds[:c.out.nfds]
+		for fd : c.out.fds[:c.out.nfds]
 			sys.close((fd: sys.fd))
 		;;
 		c.out.nfds = 0
@@ -99,7 +99,7 @@ const marshal = {c, obj, op, args
 
 	/* calculate size */
 	sz = 2
-	for arg in args
+	for arg : args
 		match arg
 		| `Argint  _                : sz++
 		| `Argdata (`std.Some d, n) : sz += 1 + (d.len + (n: std.size) + 3) / 4
@@ -114,7 +114,7 @@ const marshal = {c, obj, op, args
 	put(&p, ((sz << 16) * 4: uint32) | (op & 0xffff))
 
 	/* encode arguments */
-	for arg in args
+	for arg : args
 		match arg
 		| `Argint x: put(&p, x)
 		| `Argdata (`std.Some x, true):
