@@ -280,7 +280,7 @@ try:
         if copyright:
             f.write("/*\n")
             for line in copyright.strip().split("\n"):
-                f.write(line.strip())
+                f.write(line.encode('utf-8').strip())
                 f.write("\n")
             f.write("*/\n\n")
         generateclient(interfaces, f)
